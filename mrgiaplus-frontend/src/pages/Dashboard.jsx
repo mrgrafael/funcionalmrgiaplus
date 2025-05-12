@@ -1079,7 +1079,91 @@ export default function CRM() {
       )}
     </>
   );
-}
+} 
+// src/pages/Dashboard.jsx
+
+import React, { useEffect, useState } from "react";
+import { CardKanban } from "@/components/CardKanban";
+import { consultarLeadsPendentes, moverCardParaColuna } from "@/utils/KanbanService";
+import { enviarMensagem } from "@/utils/Mensageiro";
+import { toast } from "sonner";
+
+// 🔁 Distribuição circular com nomes reais
+let indiceDistribuicao = 0;
+const distribuirConsultora = (consultoras) => {
+  const selecionada = consultoras[indiceDistribuicao % consultoras.length];
+  indiceDistribuicao++;
+  return selecionada;
+};
+
+// ⏱️ Notificação após 30 minutos
+const iniciarTemporizador = (cliente, notificar) => {
+  setTimeout(() => {
+    if (!cliente.assumido) {
+      notificar(`⚠️ Cliente ${cliente.nome} ainda não foi assumido após 30 minutos.`);
+    }
+  }, 30 * 60 * 1000);
+};
+
+const Dashboard = () => {
+  const [leadsPendentes, setLeadsPendentes] = useState([]);
+  const [consultoras] = useState(["Julia", "Maria Julia", "Bia", "Law"]);
+  const [colunas, setColunas] = useState({
+    Atendimento: [],
+    Novo: [],
+    Proposta: [],
+    Finalizado: [],
+  });
+
+  const notificar = (msg) => toast.warning(msg);
+
+  // 🚀 Carrega e distribui os leads com IA
+  useEffect(() => {
+    const processarLeads = async () => {
+      const leads = await consultarLeadsPendentes(); // Simula API
+      const atualizados = [];
+
+      for (const cliente of leads) {
+        const msg = `Olá ${cliente.nome}, sou da MRG IA Plus. Deseja simular seu consignado agora?`;
+        await enviarMensagem(cliente.telefone, msg);
+
+        const resposta = cliente.resposta?.toLowerCase() || "";
+        const interessado = ["sim", "quero", "simular", "vamos"].some(p =>
+          resposta.includes(p)
+        );
+
+        if (interessado) {
+          const consultora = distribuirConsultora(consultoras);
+          const clienteAtualizado = { ...cliente, status: "Novo", consultora, assumido: false };
+
+          moverCardParaColuna("Novo", clienteAtualizado, setColunas);
+          iniciarTemporizador(clienteAtualizado, notificar);
+          atualizados.push(clienteAtualizado);
+        }
+      }
+
+      setLeadsPendentes([]);
+    };
+
+    processarLeads();
+  }, []);
+
+  return (
+    <div className="grid grid-cols-4 gap-4 p-4">
+      {Object.entries(colunas).map(([nome, lista]) => (
+        <div key={nome} className="bg-white rounded-xl shadow p-2 h-[80vh] overflow-y-auto">
+          <h2 className="text-xl font-bold mb-2">{nome}</h2>
+          {lista.map((card, idx) => (
+            <CardKanban key={idx} nome={card.nome} telefone={card.telefone} consultora={card.consultora} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default Dashboard;
+
 
 // TEST CASES
 // "parseCurrency" basic test:
